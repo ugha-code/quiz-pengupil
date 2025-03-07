@@ -1,4 +1,4 @@
-name: PHP Composer CI
+name: PHP CI
 
 on:
   push:
@@ -24,34 +24,11 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Verify composer.json exists
-      run: ls -lah && test -f composer.json || (echo "composer.json not found!" && exit 1)
-
-    - name: Set up PHP
-      uses: shivammathur/setup-php@v2
-      with:
-        php-version: "8.1"
-
-    - name: Validate composer.json and composer.lock
-      run: composer validate --strict
-      continue-on-error: true  # Menghindari kegagalan build jika tidak ditemukan
-
-    - name: Cache Composer packages
-      id: composer-cache
-      uses: actions/cache@v3
-      with:
-        path: vendor
-        key: ${{ runner.os }}-php-${{ hashFiles('**/composer.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-php-
-
-    - name: Install dependencies
-      run: composer install --prefer-dist --no-progress
-      continue-on-error: true
+    - name: Verify required files exist
+      run: ls -lah && test -f koneksi.php || (echo "Required files not found!" && exit 1)
 
     - name: Start PHP Server
-      run: php -S localhost:8000 -t public/ &
-      continue-on-error: true
+      run: php -S localhost:8000 -t . &
 
     - name: Install Selenium WebDriver & Dependencies
       run: |
@@ -62,15 +39,11 @@ jobs:
       run: |
         Xvfb :99 -ac &
         export DISPLAY=:99
-        python tests/test_login_register.py
-      continue-on-error: true
-
-    - name: Run PHPUnit Tests
-      run: vendor/bin/phpunit --configuration phpunit.xml
+        python test_login_register.py
       continue-on-error: true
 
     - name: Upload test results
-      uses: actions/upload-artifact@v4  # ✅ Perbaikan: update ke v4
+      uses: actions/upload-artifact@v4
       with:
         name: test-results
         path: tests/results/
