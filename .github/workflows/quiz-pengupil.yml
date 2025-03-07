@@ -9,7 +9,7 @@ on:
       - main
 
 jobs:
-  selenium-test:
+  quiz-pengupil:
     runs-on: ubuntu-latest
 
     steps:
