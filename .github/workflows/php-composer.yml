@@ -1,56 +1,85 @@
-name: PHP CI
+name: Selenium Tests
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
   pull_request:
-    branches: [ "main" ]
-
-permissions:
-  contents: read
+    branches:
+      - main
 
 jobs:
-  build:
-
+  selenium-test:
     runs-on: ubuntu-latest
-
-    services:
-      selenium:
-        image: selenium/standalone-chrome
-        ports:
-          - 4444:4444
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Verify required files exist
-      run: ls -lah && test -f koneksi.php || (echo "Required files not found!" && exit 1)
-
-    - name: Start PHP Server
-      run: php -S localhost:8000 -t . &
-
-    - name: Install Selenium WebDriver & Dependencies
+    - name: Install dependencies
       run: |
-        pip install selenium
-        sudo apt-get install -y xvfb
+        sudo apt update
+        sudo apt install -y php php-cli php-mysql unzip google-chrome-stable mariadb-server mariadb-client
 
-    - name: Debug - Cek File Test
+    - name: Start MariaDB Service
       run: |
-        echo "Checking test file existence..."
-        ls -lah tests/
-        test -f tests/test_login_register.py && echo "✅ File ditemukan!" || echo "❌ File tidak ditemukan!"
+        sudo systemctl start mariadb
+        sudo systemctl enable mariadb
+        sudo systemctl restart mariadb  # Restart untuk memastikan perubahan diterapkan
 
+    - name: Setup Database
+      run: |
+        sudo mysql --user=root --execute="CREATE DATABASE IF NOT EXISTS quiz_pengupil;"
+        sudo mysql --user=root quiz_pengupil < db/quiz_pengupil.sql
+        sudo mysql --user=root --execute="GRANT ALL PRIVILEGES ON quiz_pengupil.* TO 'root'@'localhost' IDENTIFIED BY '';"
+        sudo mysql --user=root --execute="FLUSH PRIVILEGES;"
+
+    - name: Verify Database Setup
+      run: |
+        sudo mysql -u root -e "USE quiz_pengupil; SHOW TABLES;"
+
+    - name: Start PHP server
+      run: |
+        nohup php -S 127.0.0.1:8000 -t . > server.log 2>&1 &
+        sleep 5
+        cat server.log
+
+    - name: Wait for server to start
+      run: |
+        for i in {1..10}; do
+          curl -s http://127.0.0.1:8000/ && echo "✅ Server is up!" && break
+          echo "⏳ Waiting for server..."
+          sleep 2
+        done
+
+    - name: Set Up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install Python Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install selenium webdriver-manager pytest
+
+    - name: Install Chrome WebDriver
+      run: |
+        sudo apt install -y chromium-chromedriver
+        echo "✅ Chrome WebDriver installed."
 
     - name: Run Selenium Tests
-      run: |
-        Xvfb :99 -ac &
-        export DISPLAY=:99
-        python tests/test_login_register.py  # Gunakan path yang benar
-      continue-on-error: true
+      run: python test.py
 
-    - name: Upload test results
+    - name: Upload Test Results
+      if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: test-results
-        path: tests/results/
+        name: selenium-test-results
+        path: test-results/
+
+    - name: Upload Test Logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: selenium-test-logs
+        path: test-results/test_log.txt
