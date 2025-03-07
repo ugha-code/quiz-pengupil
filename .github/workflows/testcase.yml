@@ -46,16 +46,22 @@ jobs:
     - name: Start PHP Server
       run: php -S localhost:8000 -t public/ &
 
-    - name: Run Selenium Tests
+    - name: Install Selenium WebDriver & Dependencies
       run: |
         pip install selenium
+        sudo apt-get install -y xvfb
+
+    - name: Run Selenium Tests
+      run: |
+        Xvfb :99 -ac &
+        export DISPLAY=:99
         python tests/test_login_register.py
 
     - name: Run PHPUnit Tests
       run: vendor/bin/phpunit --configuration phpunit.xml
 
     - name: Upload test results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4  # ✅ UPDATE KE V4
       with:
         name: test-results
         path: tests/results/
